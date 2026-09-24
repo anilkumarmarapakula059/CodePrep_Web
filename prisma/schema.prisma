@@ -1,0 +1,277 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id           String        @id @default(uuid())
+  email        String        @unique
+  passwordHash String
+  role         String        @default("STUDENT") // STUDENT, PROFESSIONAL, ADMIN
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+
+  profile      Profile?
+  submissions  Submission[]
+  progress     UserProgress[]
+  bookmarks    Bookmark[]
+  collections  Collection[]
+  mockSessions MockInterviewSession[]
+  achievements UserAchievement[]
+}
+
+model Profile {
+  id                String   @id @default(uuid())
+  userId            String   @unique
+  user              User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  fullName          String
+  avatar            String?
+  experienceLevel   String   @default("BEGINNER") // BEGINNER, INTERMEDIATE, ADVANCED
+  preparationGoal   String   @default("PLACEMENT") // PLACEMENT, INTERNSHIP, JOB_SWITCH, COMPETITIVE, DSA_IMPROVEMENT
+  preferredLanguage String   @default("python") // python, javascript, java, cpp, c
+  targetCompanies   String   @default("[\"Google\",\"Amazon\",\"Microsoft\",\"TCS\"]") // JSON array of string names
+  xp                Int      @default(0)
+  level             Int      @default(1)
+  streak            Int      @default(0)
+  streakLastUpdated DateTime?
+  totalSolved       Int      @default(0)
+  easySolved        Int      @default(0)
+  mediumSolved      Int      @default(0)
+  hardSolved        Int      @default(0)
+  codingMinutes     Int      @default(0)
+  onboarded         Boolean  @default(false)
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+}
+
+model Problem {
+  id                   String            @id @default(uuid())
+  slug                 String            @unique
+  title                String
+  difficulty           String            // BASIC, INTERMEDIATE, ADVANCED
+  frequency            Int               @default(3) // 1 to 5 stars
+  frequencySource      String            @default("Verified MNC Interview Reports 2024-2026")
+  acceptanceRate       Float             @default(65.0)
+  estimatedTimeMinutes Int               @default(25)
+  description          String
+  constraints          String            // JSON string array or markdown
+  inputFormat          String
+  outputFormat         String
+  examples             String            // JSON string array of { input, output, explanation }
+  starterCode          String            // JSON string mapping language to template code
+  isPublished          Boolean           @default(true)
+  createdAt            DateTime          @default(now())
+  updatedAt            DateTime          @updatedAt
+
+  topics               ProblemTopic[]
+  companies            ProblemCompany[]
+  testCases            TestCase[]
+  solutions            Solution[]
+  hints                Hint[]
+  submissions          Submission[]
+  progress             UserProgress[]
+  bookmarks            Bookmark[]
+  mockProblems         MockInterviewProblem[]
+}
+
+model Topic {
+  id          String         @id @default(uuid())
+  slug        String         @unique
+  name        String
+  category    String         // Core, Advanced, Techniques
+  description String
+  icon        String         @default("code")
+  problems    ProblemTopic[]
+}
+
+model ProblemTopic {
+  id        String   @id @default(uuid())
+  problemId String
+  topicId   String
+  problem   Problem  @relation(fields: [problemId], references: [id], onDelete: Cascade)
+  topic     Topic    @relation(fields: [topicId], references: [id], onDelete: Cascade)
+
+  @@unique([problemId, topicId])
+}
+
+model Company {
+  id                   String           @id @default(uuid())
+  slug                 String           @unique
+  name                 String
+  logo                 String
+  tier                 String           @default("Tier-1 Product") // Tier-1 Product, Service MNC, Fintech, High-Growth
+  description          String
+  hiringRounds         String           // JSON string of rounds
+  testedTopicsOverview String           // JSON string of topic name -> percentage
+  problems             ProblemCompany[]
+}
+
+model ProblemCompany {
+  id              String   @id @default(uuid())
+  problemId       String
+  companyId       String
+  frequencyWeight Int      @default(5)
+  interviewStage  String   @default("ONLINE_ASSESSMENT") // ONLINE_ASSESSMENT, TECHNICAL_ROUND_1, TECHNICAL_ROUND_2
+  problem         Problem  @relation(fields: [problemId], references: [id], onDelete: Cascade)
+  company         Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  @@unique([problemId, companyId])
+}
+
+model TestCase {
+  id             String   @id @default(uuid())
+  problemId      String
+  input          String
+  expectedOutput String
+  isHidden       Boolean  @default(false)
+  explanation    String?
+  orderIndex     Int      @default(0)
+  problem        Problem  @relation(fields: [problemId], references: [id], onDelete: Cascade)
+}
+
+model Hint {
+  id        String   @id @default(uuid())
+  problemId String
+  hintIndex Int      // 1, 2, 3
+  hintText  String
+  problem   Problem  @relation(fields: [problemId], references: [id], onDelete: Cascade)
+
+  @@unique([problemId, hintIndex])
+}
+
+model Solution {
+  id              String   @id @default(uuid())
+  problemId       String
+  approachTitle   String   // e.g. "Optimal Two-Pointer Approach", "Hash Map Frequency"
+  approachType    String   @default("OPTIMAL") // BRUTE_FORCE, BETTER, OPTIMAL
+  explanation     String
+  stepByStep      String   // JSON string array of steps
+  codePython      String
+  codeJavascript  String
+  codeJava        String
+  codeCpp         String
+  timeComplexity  String   // e.g. "O(N)"
+  spaceComplexity String   // e.g. "O(1)"
+  problem         Problem  @relation(fields: [problemId], references: [id], onDelete: Cascade)
+}
+
+model Submission {
+  id                     String   @id @default(uuid())
+  userId                 String
+  problemId              String
+  language               String
+  code                   String
+  status                 String   // ACCEPTED, WRONG_ANSWER, TIME_LIMIT_EXCEEDED, MEMORY_LIMIT_EXCEEDED, COMPILATION_ERROR, RUNTIME_ERROR
+  executionTimeMs        Int      @default(0)
+  memoryKb               Int      @default(0)
+  passedTestCases        Int      @default(0)
+  totalTestCases         Int      @default(0)
+  failedTestCaseInput    String?
+  failedTestCaseExpected String?
+  failedTestCaseActual   String?
+  errorMessage           String?
+  createdAt              DateTime @default(now())
+
+  user                   User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  problem                Problem  @relation(fields: [problemId], references: [id], onDelete: Cascade)
+}
+
+model UserProgress {
+  id              String    @id @default(uuid())
+  userId          String
+  problemId       String
+  status          String    @default("ATTEMPTED") // ATTEMPTED, SOLVED
+  attemptsCount   Int       @default(1)
+  firstAttemptAt  DateTime  @default(now())
+  solvedAt        DateTime?
+  lastAttemptAt   DateTime  @default(now())
+
+  user            User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  problem         Problem   @relation(fields: [problemId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, problemId])
+}
+
+model Bookmark {
+  id           String      @id @default(uuid())
+  userId       String
+  problemId    String
+  collectionId String?
+  notes        String?
+  createdAt    DateTime    @default(now())
+
+  user         User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  problem      Problem     @relation(fields: [problemId], references: [id], onDelete: Cascade)
+  collection   Collection? @relation(fields: [collectionId], references: [id], onDelete: SetNull)
+
+  @@unique([userId, problemId])
+}
+
+model Collection {
+  id          String     @id @default(uuid())
+  userId      String
+  name        String
+  description String?
+  isPublic    Boolean    @default(false)
+  createdAt   DateTime   @default(now())
+
+  user        User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  bookmarks   Bookmark[]
+}
+
+model MockInterviewSession {
+  id              String                 @id @default(uuid())
+  userId          String
+  difficulty      String                 // BASIC, INTERMEDIATE, ADVANCED
+  durationMinutes Int                    // 30, 45, 60
+  companyName     String?
+  topicName       String?
+  status          String                 @default("IN_PROGRESS") // IN_PROGRESS, COMPLETED, ABANDONED
+  score           Int                    @default(0)
+  totalProblems   Int                    @default(3)
+  solvedCount     Int                    @default(0)
+  feedbackJson    String?                // Detailed evaluation report
+  startedAt       DateTime               @default(now())
+  completedAt     DateTime?
+
+  user            User                   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  problems        MockInterviewProblem[]
+}
+
+model MockInterviewProblem {
+  id         String               @id @default(uuid())
+  sessionId  String
+  problemId  String
+  orderIndex Int
+  status     String               @default("UNSOLVED") // UNSOLVED, SOLVED
+
+  session    MockInterviewSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  problem    Problem              @relation(fields: [problemId], references: [id], onDelete: Cascade)
+}
+
+model Achievement {
+  id          String            @id @default(uuid())
+  slug        String            @unique
+  title       String
+  description String
+  icon        String
+  badgeType   String            // BRONZE, SILVER, GOLD, PLATINUM
+  xpReward    Int               @default(100)
+  users       UserAchievement[]
+}
+
+model UserAchievement {
+  id            String      @id @default(uuid())
+  userId        String
+  achievementId String
+  unlockedAt    DateTime    @default(now())
+
+  user          User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  achievement   Achievement @relation(fields: [achievementId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, achievementId])
+}
